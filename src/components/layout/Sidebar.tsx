@@ -20,7 +20,13 @@ import {
 
 export type NavTab =
   | 'dashboard'
+  | 'lazuardi-matrix'
+  | 'classes'
   | 'students'
+  | 'emotion-tracker'
+  | 'ldss-screening'
+  | 'supervisions'
+  | 'case-conferences'
   | 'behavior'
   | 'social-emotional'
   | 'support-plans'
@@ -60,14 +66,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     {
       id: 'dashboard' as NavTab,
-      label: 'Dashboard',
+      label: 'Dashboard MTSS',
       icon: <LayoutDashboard className="w-4 h-4" />,
       allowed: true,
     },
     {
+      id: 'lazuardi-matrix' as NavTab,
+      label: 'Dashboard Support Lazuardi',
+      icon: <FileSpreadsheet className="w-4 h-4" />,
+      badge: 'Form Keluhan',
+      badgeColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+      allowed: true,
+    },
+    {
+      id: 'emotion-tracker' as NavTab,
+      label: 'Check-In & Out Emosi',
+      icon: <Sparkles className="w-4 h-4" />,
+      badge: 'CICO 21x',
+      badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold',
+      allowed: true,
+    },
+    {
+      id: 'classes' as NavTab,
+      label: 'Data Kelas & Paralel',
+      icon: <Layers className="w-4 h-4" />,
+      allowed: true,
+    },
+    {
       id: 'students' as NavTab,
-      label: isGuru ? 'Siswa Kelas Saya' : 'Data Seluruh Siswa',
+      label: isGuru ? 'Siswa Kelas Saya' : 'Data Siswa & Tier 1/2/3',
       icon: <Users className="w-4 h-4" />,
+      allowed: true,
+    },
+    {
+      id: 'ldss-screening' as NavTab,
+      label: 'Pengisian Skrining LDSS',
+      icon: <FileText className="w-4 h-4" />,
+      allowed: true,
+    },
+    {
+      id: 'supervisions' as NavTab,
+      label: 'Supervisi Kepsek & Kabid',
+      icon: <GitBranch className="w-4 h-4" />,
+      allowed: true,
+    },
+    {
+      id: 'case-conferences' as NavTab,
+      label: 'Jadwal Case Conference',
+      icon: <HeartHandshake className="w-4 h-4" />,
       allowed: true,
     },
     {

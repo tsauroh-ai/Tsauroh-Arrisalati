@@ -253,7 +253,7 @@ export interface SystemConfig {
 
 export interface AuditLog {
   id: string;
-  entityType: 'STUDENT' | 'BEHAVIOR_OBS' | 'SE_OBS' | 'SUPPORT_PLAN' | 'INTERVENTION_LOG' | 'PROGRESS' | 'FOLLOW_UP' | 'MTSS_REVIEW' | 'USER' | 'CONFIG';
+  entityType: 'STUDENT' | 'BEHAVIOR_OBS' | 'SE_OBS' | 'SUPPORT_PLAN' | 'INTERVENTION_LOG' | 'PROGRESS' | 'FOLLOW_UP' | 'MTSS_REVIEW' | 'USER' | 'CONFIG' | 'EMOTION' | 'LDSS' | 'SUPERVISION' | 'CASE_CONFERENCE';
   entityId: string;
   actionType: 'CREATE' | 'UPDATE' | 'DELETE' | 'TIER_CHANGE' | 'STATUS_CHANGE' | 'REVIEW_COMPLETED';
   description: string;
@@ -264,4 +264,163 @@ export interface AuditLog {
   userRole: UserRole;
   timestamp: string;
   reason?: string;
+}
+
+// --- Emotion Check-in & Check-out ---
+export type EmotionType = 'senang' | 'tenang' | 'bersemangat' | 'sedih' | 'marah' | 'cemas' | 'lelah' | 'kecewa';
+export type WeatherFeeling = 'cerah' | 'berawan' | 'hujan' | 'badai' | 'pelangi';
+
+export interface SingleEmotionCheck {
+  time: string;
+  emotion: EmotionType;
+  moodScore: number; // 1 to 10
+  weatherFeeling?: WeatherFeeling;
+  primaryFeeling?: string;
+  energyLevel?: 'Rendah' | 'Sedang' | 'Tinggi';
+  contextOrTrigger?: string;
+  highlightsOfDay?: string;
+  gratitudeNote?: string;
+  challengesFelt?: string;
+  goalsForTomorrow?: string;
+  notes?: string;
+  recordedById: string;
+  recordedByName: string;
+  recordedByRole: string;
+  recordedAt: string;
+}
+
+export interface EmotionRecord {
+  id: string;
+  studentId: string;
+  studentName: string;
+  classId: string;
+  className: string;
+  date: string; // YYYY-MM-DD
+  checkIn?: SingleEmotionCheck;
+  checkOut?: SingleEmotionCheck;
+  cycle21Count?: number; // Melacak program "Check in & Check Out 21x"
+}
+
+// --- LDSS (Lazuardi Disability Screening System) ---
+export type LdssStatus = 'Belum Diisi' | 'Dalam Proses' | 'Selesai';
+
+export interface LdssScores {
+  motorikSensori: number; // 1 to 5
+  komunikasiBahasa: number; // 1 to 5
+  kognitifAkademik: number; // 1 to 5
+  perilakuRegulasiEmosi: number; // 1 to 5
+  interaksiSosial: number; // 1 to 5
+  kemandirian: number; // 1 to 5
+}
+
+export interface LdssRecord {
+  id: string;
+  studentId: string;
+  studentName: string;
+  classId: string;
+  className: string;
+  dateFilled: string;
+  filledById: string;
+  filledByName: string;
+  filledByRole: string;
+  status: LdssStatus;
+  findingsSummary: string; // Temuan observasi guru
+  targetGoals: string; // Target pencapaian perkembangan
+  scores: LdssScores;
+  observationsNotes?: Record<string, string>;
+  recommendedTier: TierLevel;
+  followUpRecommendations: string[]; // e.g. "Supervisi", "Case Conference", "Check in & Check out 21x", "Rujukan Klinis"
+  documentDriveUrl?: string; // Link drive hasil asesmen / dokumen
+  principalCheckStatus?: 'Pending' | 'In Progress' | 'Complete';
+  inclusiveHeadCheckStatus?: 'Pending' | 'In Progress' | 'Complete';
+  notes?: string;
+}
+
+// --- Supervisi Kepala Sekolah & Kepala Bidang Pendidikan Inklusif ---
+export type SupervisorRole = 'Kepala Sekolah' | 'Kepala Bidang Inklusif' | 'Keduanya';
+export type SupervisionStatus = 'Terjadwal' | 'Selesai' | 'Menunggu Revisi Report' | 'Dibatalkan';
+
+export interface SupervisionSchedule {
+  id: string;
+  studentId: string;
+  studentName: string;
+  classId: string;
+  className: string;
+  teacherName: string;
+  supervisorRole: SupervisorRole;
+  supervisorName: string; // "Dr. Sari, M.Pd." (Kepsek) atau "M. Ghofar, M.Psi." (Kabid Inklusif)
+  scheduledDate: string; // e.g. "Senin, 28 September 2026" or "YYYY-MM-DD"
+  time?: string;
+  topic: string; // Fokus supervisi (e.g. "Supervisi fokus pembelajaran klasikal", "Regulasi emosi & pola asuh")
+  status: SupervisionStatus;
+  hasilSupervisi?: string;
+  catatanTindakLanjut?: string;
+  chekingKepalaSekolah: {
+    status: 'Pending' | 'In Progress' | 'Complete';
+    revisiReport?: string; // Catatan revisi report
+    completedDate?: string;
+  };
+  chekingKepalaBidangInklusif: {
+    status: 'Pending' | 'In Progress' | 'Complete';
+    catatan?: string;
+    completedDate?: string;
+  };
+}
+
+// --- Case Conference ---
+export type CaseConferenceStatus = 'Direkomendasikan' | 'Dijadwalkan' | 'Selesai' | 'Ditinjau Ulang';
+
+export interface CaseConferenceRecord {
+  id: string;
+  studentId: string;
+  studentName: string;
+  classId: string;
+  className: string;
+  teacherName: string;
+  reasonForConference: string; // Latar belakang & temuan (e.g. keterlambatan, gap akademik jauh, konflik perilaku)
+  status: CaseConferenceStatus;
+  scheduledDate?: string; // e.g. "Rabu, 14 Oktober 2026"
+  scheduledTime?: string;
+  location?: string;
+  participants: string[]; // ['M. Ghofar, M.Psi. (Kabid Inklusif)', 'Dr. Sari, M.Pd. (Kepala Sekolah)', 'Ovnica Nitasari (Koordinator)', 'Wali Kelas', 'Orang Tua Siswa']
+  previousAssessments?: {
+    clinicalDiagnosis?: string; // Hasil diagnosis klinis
+    psychotest?: string; // Psikotest
+    speechTherapy?: string; // Terapi wicara
+    occupationalTherapy?: string; // Okupasi terapi
+    psbObservation?: string; // Hasil observasi PSB
+  };
+  draftBipTitle?: string; // Draft BIP (Behavior Intervention Plan)
+  agreedCommitments?: string; // Komitmen bersama orang tua & sekolah
+  minutesDecisions?: string; // Notulensi kesepakatan
+  followUpActions?: string[];
+  recommendationDate: string;
+}
+
+// Rekap Siswa Terpadu Lazuardi GCS (Form Keluhan & Student Support Form)
+export interface LazuardiStudentSupportRow {
+  studentId: string;
+  no: number;
+  gradeParallel: number; // 1, 2, 3, 4, 5, 6
+  studentName: string;
+  className: string;
+  teacherName: string;
+  currentTier: TierLevel;
+  findings: string; // Temuan
+  target: string; // Target
+  ldssStatus: LdssStatus;
+  tindakLanjut: string; // Supervisi / Check in & Check Out 21x / Case Conference / dll
+  jadwalTindakLanjut?: string;
+  jadwalPakGhofar?: string; // Jadwal Kepala Bidang Inklusif
+  hasilDiagnosaKlinis?: string;
+  psikotest?: string;
+  terapiWicara?: string;
+  okupasiTerapi?: string;
+  hasilObservasiPsb?: string;
+  draftBip?: string;
+  catatan?: string;
+  chekingKepalaSekolah?: 'Pending' | 'In Progress' | 'Complete';
+  revisiReportKepsek?: string;
+  chekingKabidInklusif?: 'Pending' | 'In Progress' | 'Complete';
+  statusJadwal?: string;
 }

@@ -11,6 +11,12 @@ import { Header } from './components/layout/Header';
 
 // Views
 import { DashboardView } from './views/DashboardView';
+import { LazuardiSupportDashboardView } from './views/LazuardiSupportDashboardView';
+import { EmotionTrackerView } from './views/EmotionTrackerView';
+import { ClassesView } from './views/ClassesView';
+import { LdssScreeningView } from './views/LdssScreeningView';
+import { SupervisionsView } from './views/SupervisionsView';
+import { CaseConferencesView } from './views/CaseConferencesView';
 import { StudentsView } from './views/StudentsView';
 import { StudentDetailView } from './views/StudentDetailView';
 import { BehaviorObservationsView } from './views/BehaviorObservationsView';
@@ -101,8 +107,32 @@ const MainApp: React.FC = () => {
                   onSelectStudent={handleSelectStudent}
                 />
               )}
+              {activeTab === 'lazuardi-matrix' && (
+                <LazuardiSupportDashboardView
+                  onSelectStudent={handleSelectStudent}
+                  onNavigateToTab={handleSelectTab}
+                />
+              )}
+              {activeTab === 'emotion-tracker' && (
+                <EmotionTrackerView onSelectStudent={handleSelectStudent} />
+              )}
+              {activeTab === 'classes' && (
+                <ClassesView
+                  onSelectStudent={handleSelectStudent}
+                  onNavigateToTab={handleSelectTab}
+                />
+              )}
               {activeTab === 'students' && (
                 <StudentsView onSelectStudent={handleSelectStudent} />
+              )}
+              {activeTab === 'ldss-screening' && (
+                <LdssScreeningView onSelectStudent={handleSelectStudent} />
+              )}
+              {activeTab === 'supervisions' && (
+                <SupervisionsView onSelectStudent={handleSelectStudent} />
+              )}
+              {activeTab === 'case-conferences' && (
+                <CaseConferencesView onSelectStudent={handleSelectStudent} />
               )}
               {activeTab === 'behavior' && (
                 <BehaviorObservationsView onSelectStudent={handleSelectStudent} />

@@ -14,6 +14,11 @@ import {
   MasterStrategy,
   TierLevel,
   SocialEmotionalScale,
+  EmotionRecord,
+  LdssRecord,
+  SupervisionSchedule,
+  CaseConferenceRecord,
+  SingleEmotionCheck,
 } from '../types';
 import {
   ArrowLeft,
@@ -33,6 +38,12 @@ import {
   CheckCircle2,
   ChevronRight,
   BookOpen,
+  Smile,
+  ClipboardCheck,
+  Flame,
+  Sun,
+  Heart,
+  ExternalLink,
 } from 'lucide-react';
 import {
   TierBadge,
@@ -60,10 +71,15 @@ import {
 interface StudentDetailViewProps {
   studentId: string;
   onBack: () => void;
+  onSelectStudent?: (studentId: string) => void;
 }
 
 export type StudentProfileTab =
   | 'summary'
+  | 'emotion_tracker'
+  | 'ldss_screening'
+  | 'supervision_history'
+  | 'case_conference'
   | 'behavior'
   | 'social_emotional'
   | 'support_plan'
@@ -80,6 +96,10 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentId,
   const [student, setStudent] = useState<Student | null>(null);
   const [behaviorObs, setBehaviorObs] = useState<BehaviorObservation[]>([]);
   const [seObs, setSeObs] = useState<SocialEmotionalObservation[]>([]);
+  const [emotionRecords, setEmotionRecords] = useState<EmotionRecord[]>([]);
+  const [ldssRecord, setLdssRecord] = useState<LdssRecord | null>(null);
+  const [supervisions, setSupervisions] = useState<SupervisionSchedule[]>([]);
+  const [caseConferences, setCaseConferences] = useState<CaseConferenceRecord[]>([]);
   const [plans, setPlans] = useState<SupportPlan[]>([]);
   const [logs, setLogs] = useState<InterventionLog[]>([]);
   const [progressRecords, setProgressRecords] = useState<ProgressMonitoringRecord[]>([]);
@@ -92,11 +112,21 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentId,
   // Modal States
   const [isBehaviorModalOpen, setIsBehaviorModalOpen] = useState(false);
   const [isSeModalOpen, setIsSeModalOpen] = useState(false);
+  const [isEmotionModalOpen, setIsEmotionModalOpen] = useState(false);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+
+  // Emotion Modal Fields
+  const [emotionModalTab, setEmotionModalTab] = useState<'checkIn' | 'checkOut'>('checkIn');
+  const [emoFormDate, setEmoFormDate] = useState(new Date().toISOString().split('T')[0]);
+  const [emoFormEmotion, setEmoFormEmotion] = useState<'senang' | 'tenang' | 'bersemangat' | 'sedih' | 'marah' | 'cemas' | 'lelah' | 'kecewa'>('senang');
+  const [emoFormScore, setEmoFormScore] = useState(8);
+  const [emoFormWeather, setEmoFormWeather] = useState<'cerah' | 'berawan' | 'hujan' | 'badai' | 'pelangi'>('cerah');
+  const [emoFormPrimary, setEmoFormPrimary] = useState('Siap Belajar');
+  const [emoFormNotes, setEmoFormNotes] = useState('');
 
   // Forms State
   const [behForm, setBehForm] = useState({
@@ -189,6 +219,10 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentId,
         studentData,
         behData,
         seData,
+        emoData,
+        ldssData,
+        supData,
+        ccData,
         planData,
         logData,
         progData,
@@ -200,6 +234,10 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentId,
         api.getStudent(studentId),
         api.getBehaviorObservations({ studentId }),
         api.getSocialEmotionalObservations({ studentId }),
+        api.getEmotions({ studentId }),
+        api.getLdssRecord(studentId),
+        api.getSupervisions({ studentId }),
+        api.getCaseConferences({ studentId }),
         api.getSupportPlans(studentId),
         api.getInterventionLogs({ studentId }),
         api.getProgressRecords(studentId),
@@ -212,6 +250,10 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentId,
       setStudent(studentData);
       setBehaviorObs(behData);
       setSeObs(seData);
+      setEmotionRecords(emoData);
+      setLdssRecord(ldssData);
+      setSupervisions(supData);
+      setCaseConferences(ccData);
       setPlans(planData);
       setLogs(logData);
       setProgressRecords(progData);
@@ -242,6 +284,59 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentId,
   }
 
   // Action Submissions
+  const handleSaveEmotion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !student) return;
+    try {
+      const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const existing = emotionRecords.find(r => r.date === emoFormDate);
+
+      const checkInData = emotionModalTab === 'checkIn' ? {
+        time: existing?.checkIn?.time || nowTime,
+        emotion: emoFormEmotion,
+        moodScore: emoFormScore,
+        weatherFeeling: emoFormWeather,
+        primaryFeeling: emoFormPrimary,
+        energyLevel: 'Sedang' as const,
+        notes: emoFormNotes,
+        recordedById: currentUser.id,
+        recordedByName: currentUser.name,
+        recordedByRole: currentUser.roleTitle,
+        recordedAt: new Date().toISOString(),
+      } : existing?.checkIn;
+
+      const checkOutData = emotionModalTab === 'checkOut' ? {
+        time: existing?.checkOut?.time || nowTime,
+        emotion: emoFormEmotion,
+        moodScore: emoFormScore,
+        weatherFeeling: emoFormWeather,
+        primaryFeeling: emoFormPrimary,
+        energyLevel: 'Sedang' as const,
+        highlightsOfDay: emoFormNotes,
+        notes: emoFormNotes,
+        recordedById: currentUser.id,
+        recordedByName: currentUser.name,
+        recordedByRole: currentUser.roleTitle,
+        recordedAt: new Date().toISOString(),
+      } : existing?.checkOut;
+
+      await api.saveEmotion({
+        studentId: student.id,
+        studentName: student.fullName,
+        classId: student.classId,
+        className: student.className,
+        date: emoFormDate,
+        ...(checkInData ? { checkIn: checkInData } : {}),
+        ...(checkOutData ? { checkOut: checkOutData } : {}),
+      });
+
+      setIsEmotionModalOpen(false);
+      loadStudentData();
+    } catch (err: any) {
+      alert(err.message || 'Gagal menyimpan catatan emosi');
+    }
+  };
+
   const handleSaveBehaviorObs = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -365,38 +460,58 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentId,
   const tabs = [
     { id: 'summary' as StudentProfileTab, label: '1. Ringkasan Profil', icon: <User className="w-3.5 h-3.5" /> },
     {
+      id: 'emotion_tracker' as StudentProfileTab,
+      label: `2. Check-In & Out Emosi (${emotionRecords.length})`,
+      icon: <Smile className="w-3.5 h-3.5" />,
+    },
+    {
+      id: 'ldss_screening' as StudentProfileTab,
+      label: `3. Skrining LDSS ${ldssRecord ? '✓' : ''}`,
+      icon: <ClipboardCheck className="w-3.5 h-3.5" />,
+    },
+    {
+      id: 'supervision_history' as StudentProfileTab,
+      label: `4. Supervisi (${supervisions.length})`,
+      icon: <ShieldCheck className="w-3.5 h-3.5" />,
+    },
+    {
+      id: 'case_conference' as StudentProfileTab,
+      label: `5. Case Conference (${caseConferences.length})`,
+      icon: <HeartHandshake className="w-3.5 h-3.5" />,
+    },
+    {
       id: 'behavior' as StudentProfileTab,
-      label: `2. Observasi Behavior (${behaviorObs.length})`,
+      label: `6. Observasi Behavior (${behaviorObs.length})`,
       icon: <Eye className="w-3.5 h-3.5" />,
     },
     {
       id: 'social_emotional' as StudentProfileTab,
-      label: `3. Social Emotional (${seObs.length})`,
+      label: `7. Social Emotional (${seObs.length})`,
       icon: <HeartHandshake className="w-3.5 h-3.5" />,
     },
     {
       id: 'support_plan' as StudentProfileTab,
-      label: `4. Rencana Dukungan (${plans.length})`,
+      label: `8. Rencana Dukungan (${plans.length})`,
       icon: <Target className="w-3.5 h-3.5" />,
     },
     {
       id: 'intervention_log' as StudentProfileTab,
-      label: `5. Log Intervensi (${logs.length})`,
+      label: `9. Log Intervensi (${logs.length})`,
       icon: <FileSpreadsheet className="w-3.5 h-3.5" />,
     },
     {
       id: 'progress' as StudentProfileTab,
-      label: `6. Progress Monitoring (${progressRecords.length})`,
+      label: `10. Progress Monitoring (${progressRecords.length})`,
       icon: <TrendingUp className="w-3.5 h-3.5" />,
     },
     {
       id: 'follow_up' as StudentProfileTab,
-      label: `7. Tindak Lanjut (${followUps.length})`,
+      label: `11. Tindak Lanjut (${followUps.length})`,
       icon: <CheckSquare className="w-3.5 h-3.5" />,
     },
     {
       id: 'history_review' as StudentProfileTab,
-      label: `8. Riwayat & Alur Review (${reviews.length})`,
+      label: `12. Riwayat & Alur Review (${reviews.length})`,
       icon: <History className="w-3.5 h-3.5" />,
     },
   ];
@@ -577,6 +692,384 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentId,
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Tab: Check-In & Out Emosi */}
+      {activeTab === 'emotion_tracker' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Riwayat Check-In & Check-Out Emosi</h3>
+              <p className="text-xs text-slate-500">
+                Pencatatan harian kondisi emosi pagi (masuk) dan refleksi siang (pulang) serta monitoring program "Check-in & Check-out 21x".
+              </p>
+            </div>
+            {canWriteObservations && (
+              <button
+                onClick={() => {
+                  setEmotionModalTab('checkIn');
+                  setIsEmotionModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
+              >
+                <Smile className="w-3.5 h-3.5" />
+                <span>+ Catat Emosi Siswa</span>
+              </button>
+            )}
+          </div>
+
+          {/* CICO 21x status */}
+          <div className="bg-gradient-to-r from-amber-50 to-purple-50 p-4 rounded-2xl border border-amber-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center">
+                <Flame className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">Program Khusus Lazuardi: "Check In & Check Out 21x"</h4>
+                <p className="text-[11px] text-slate-600">
+                  Target konsistensi adaptasi & regulasi perilaku selama 21 siklus berturut-turut.
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-base font-bold text-purple-700">
+                {emotionRecords.length > 0 && emotionRecords[0].cycle21Count ? emotionRecords[0].cycle21Count : emotionRecords.length} / 21 Hari
+              </span>
+              <div className="w-28 bg-slate-200 h-1.5 rounded-full mt-1 overflow-hidden">
+                <div
+                  className="bg-purple-600 h-1.5 rounded-full"
+                  style={{
+                    width: `${Math.min(100, ((emotionRecords.length > 0 && emotionRecords[0].cycle21Count ? emotionRecords[0].cycle21Count : emotionRecords.length) / 21) * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {emotionRecords.length === 0 ? (
+            <EmptyState
+              title="Belum ada riwayat check-in emosi"
+              description="Catat perasaan siswa saat datang di pagi hari dan saat pulang sekolah."
+              actionLabel={canWriteObservations ? 'Catat Emosi Pertama' : undefined}
+              onAction={() => {
+                setEmotionModalTab('checkIn');
+                setIsEmotionModalOpen(true);
+              }}
+            />
+          ) : (
+            <div className="space-y-3">
+              {emotionRecords.map(rec => (
+                <div key={rec.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-emerald-600" />
+                      <strong className="text-xs text-slate-900">{rec.date}</strong>
+                    </div>
+                    {rec.cycle21Count && (
+                      <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                        CICO Day {rec.cycle21Count}/21
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    {/* Check-In */}
+                    <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/70 space-y-1.5">
+                      <div className="flex items-center justify-between text-amber-900 font-bold">
+                        <span>🌅 Check-In Pagi (Masuk)</span>
+                        {rec.checkIn && <span className="font-mono text-slate-700">{rec.checkIn.time}</span>}
+                      </div>
+                      {rec.checkIn ? (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-800 capitalize">
+                              Perasaan: {rec.checkIn.emotion}
+                            </span>
+                            <span className="font-mono font-bold text-amber-800 bg-white px-1.5 py-0.2 rounded border border-amber-200">
+                              Skor Mood: {rec.checkIn.moodScore}/10
+                            </span>
+                          </div>
+                          {rec.checkIn.primaryFeeling && (
+                            <p className="text-[11px] text-slate-700">"{rec.checkIn.primaryFeeling}"</p>
+                          )}
+                          {rec.checkIn.notes && (
+                            <p className="text-[10px] text-slate-500 italic">Catatan: {rec.checkIn.notes}</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-slate-400 italic">Belum check-in pagi</p>
+                      )}
+                    </div>
+
+                    {/* Check-Out */}
+                    <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/70 space-y-1.5">
+                      <div className="flex items-center justify-between text-blue-900 font-bold">
+                        <span>🌆 Check-Out Siang (Pulang)</span>
+                        {rec.checkOut && <span className="font-mono text-slate-700">{rec.checkOut.time}</span>}
+                      </div>
+                      {rec.checkOut ? (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-800 capitalize">
+                              Perasaan: {rec.checkOut.emotion}
+                            </span>
+                            <span className="font-mono font-bold text-blue-800 bg-white px-1.5 py-0.2 rounded border border-blue-200">
+                              Skor Mood: {rec.checkOut.moodScore}/10
+                            </span>
+                          </div>
+                          {rec.checkOut.highlightsOfDay && (
+                            <p className="text-[11px] text-slate-700">🌟 Highlight: {rec.checkOut.highlightsOfDay}</p>
+                          )}
+                          {rec.checkOut.gratitudeNote && (
+                            <p className="text-[11px] text-slate-600">🙏 Syukur: {rec.checkOut.gratitudeNote}</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-slate-400 italic">Belum check-out siang</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Skrining LDSS */}
+      {activeTab === 'ldss_screening' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Instrumen Skrining LDSS</h3>
+              <p className="text-xs text-slate-500">
+                Lazuardi Disability Screening System: Profil 6 dimensi sensori, komunikasi, kognitif, emosi, interaksi, dan kemandirian.
+              </p>
+            </div>
+          </div>
+
+          {ldssRecord ? (
+            <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-4 text-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Status Pengisian:</span>
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{ldssRecord.status} (Tanggal: {ldssRecord.dateFilled})</span>
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-400 block">Rekomendasi MTSS:</span>
+                  <span className="font-bold text-purple-700 text-sm">{ldssRecord.recommendedTier}</span>
+                </div>
+              </div>
+
+              {/* 6 Dimensi Grid */}
+              <div>
+                <h4 className="font-bold text-slate-800 mb-2">Skor 6 Dimensi Skrining (Skala 1 - 5):</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-center">
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] text-slate-500 block">1. Motorik & Sensori</span>
+                    <strong className="text-base text-slate-900">{ldssRecord.scores.motorikSensori} / 5</strong>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] text-slate-500 block">2. Komunikasi & Bahasa</span>
+                    <strong className="text-base text-slate-900">{ldssRecord.scores.komunikasiBahasa} / 5</strong>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] text-slate-500 block">3. Kesiapan Akademik</span>
+                    <strong className="text-base text-slate-900">{ldssRecord.scores.kognitifAkademik} / 5</strong>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] text-slate-500 block">4. Regulasi Emosi</span>
+                    <strong className={`text-base ${ldssRecord.scores.perilakuRegulasiEmosi <= 2 ? 'text-rose-700 font-black' : 'text-slate-900'}`}>
+                      {ldssRecord.scores.perilakuRegulasiEmosi} / 5
+                    </strong>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] text-slate-500 block">5. Interaksi Sosial</span>
+                    <strong className="text-base text-slate-900">{ldssRecord.scores.interaksiSosial} / 5</strong>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] text-slate-500 block">6. Kemandirian Diri</span>
+                    <strong className="text-base text-slate-900">{ldssRecord.scores.kemandirian} / 5</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Temuan & Target */}
+              <div className="space-y-2">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="font-bold text-slate-700 block mb-0.5">Temuan Observasi Guru:</span>
+                  <p className="text-slate-800">{ldssRecord.findingsSummary || '-'}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="font-bold text-slate-700 block mb-0.5">Target Capaian:</span>
+                  <p className="text-slate-800">{ldssRecord.targetGoals || '-'}</p>
+                </div>
+              </div>
+
+              {/* Tindak Lanjut Checklist */}
+              <div>
+                <span className="font-bold text-slate-700 block mb-1">Rekomendasi Tindak Lanjut:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {ldssRecord.followUpRecommendations?.map((rec, i) => (
+                    <span key={i} className="px-2.5 py-1 bg-purple-50 text-purple-800 rounded-lg font-bold border border-purple-200">
+                      ✓ {rec}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {ldssRecord.documentDriveUrl && (
+                <div className="p-2.5 bg-sky-50 rounded-xl border border-sky-200 flex items-center justify-between">
+                  <span className="text-sky-900 font-semibold">Berkas Google Drive Asesmen:</span>
+                  <a
+                    href={ldssRecord.documentDriveUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-bold text-sky-700 hover:underline flex items-center gap-1 text-xs"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Buka Tautan Drive</span>
+                  </a>
+                </div>
+              )}
+            </div>
+          ) : (
+            <EmptyState
+              title="Belum ada instrumen LDSS terisi"
+              description="Isi skrining 6 dimensi LDSS melalui menu Skrining LDSS."
+            />
+          )}
+        </div>
+      )}
+
+      {/* Tab: Supervisi Kepsek & Kabid */}
+      {activeTab === 'supervision_history' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Riwayat & Jadwal Supervisi</h3>
+              <p className="text-xs text-slate-500">
+                Supervisi langsung oleh Dr. Sari (Kepala Sekolah) dan M. Ghofar (Kepala Bidang Inklusif).
+              </p>
+            </div>
+          </div>
+
+          {supervisions.length === 0 ? (
+            <EmptyState
+              title="Belum ada jadwal supervisi untuk siswa ini"
+              description="Supervisi dijadwalkan secara berkala untuk monitoring efektivitas intervensi."
+            />
+          ) : (
+            <div className="space-y-3">
+              {supervisions.map(sup => (
+                <div key={sup.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div>
+                      <span className="font-bold text-slate-900 text-sm">{sup.topic}</span>
+                      <p className="text-[11px] text-slate-500">
+                        Jadwal: <strong>{sup.scheduledDate}</strong> pukul {sup.time || '08:30'} • Supervisor: {sup.supervisorName} ({sup.supervisorRole})
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                      {sup.status}
+                    </span>
+                  </div>
+
+                  {sup.hasilSupervisi && (
+                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                      <span className="font-bold text-slate-700 block mb-0.5">Hasil Observasi Supervisi:</span>
+                      <p className="text-slate-800">{sup.hasilSupervisi}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                      <span className="font-bold text-slate-700 block">Checking Kepala Sekolah:</span>
+                      <span className="font-semibold text-emerald-700">{sup.chekingKepalaSekolah?.status || 'Pending'}</span>
+                      {sup.chekingKepalaSekolah?.revisiReport && (
+                        <p className="text-slate-500 text-[10px] mt-0.5">Revisi: {sup.chekingKepalaSekolah.revisiReport}</p>
+                      )}
+                    </div>
+                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                      <span className="font-bold text-slate-700 block">Checking Kabid Inklusif:</span>
+                      <span className="font-semibold text-emerald-700">{sup.chekingKepalaBidangInklusif?.status || 'Pending'}</span>
+                      {sup.chekingKepalaBidangInklusif?.catatan && (
+                        <p className="text-slate-500 text-[10px] mt-0.5">Catatan: {sup.chekingKepalaBidangInklusif.catatan}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Case Conference */}
+      {activeTab === 'case_conference' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Rekomendasi & Jadwal Case Conference</h3>
+              <p className="text-xs text-slate-500">
+                Musyawarah komprehensif bersama Kepala Sekolah, Kabid Inklusif, Wali Kelas, Orang Tua, dan Tim Ahli.
+              </p>
+            </div>
+          </div>
+
+          {caseConferences.length === 0 ? (
+            <EmptyState
+              title="Belum ada rekaman Case Conference"
+              description="Case Conference direkomendasikan jika siswa memerlukan kesepakatan komitmen bersama atau eskalasi Tier 3."
+            />
+          ) : (
+            <div className="space-y-3">
+              {caseConferences.map(cc => (
+                <div key={cc.id} className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div>
+                      <span className="font-bold text-slate-900 text-sm">Sidang Case Conference</span>
+                      <p className="text-[11px] text-slate-500">
+                        Jadwal: <strong>{cc.scheduledDate || 'Dalam penjadwalan'}</strong> {cc.scheduledTime && `• ${cc.scheduledTime}`}
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
+                      {cc.status}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100">
+                    <span className="font-bold text-purple-950 block mb-0.5">Latar Belakang / Alasan:</span>
+                    <p className="text-purple-900">{cc.reasonForConference}</p>
+                  </div>
+
+                  {cc.draftBipTitle && (
+                    <div className="text-[11px] font-semibold text-slate-800">
+                      📄 Dokumen BIP Terkait: <strong className="text-purple-700">{cc.draftBipTitle}</strong>
+                    </div>
+                  )}
+
+                  {cc.agreedCommitments && (
+                    <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200">
+                      <span className="font-bold text-emerald-950 block mb-0.5">🤝 Komitmen Bersama Orang Tua & Sekolah:</span>
+                      <p className="text-emerald-900">{cc.agreedCommitments}</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <span className="font-bold text-slate-700 block mb-0.5 text-[11px]">Peserta Hadir:</span>
+                    <p className="text-slate-600 text-[11px]">
+                      {cc.participants ? cc.participants.join(' • ') : '-'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1071,6 +1564,146 @@ export const StudentDetailView: React.FC<StudentDetailViewProps> = ({ studentId,
       )}
 
       {/* --- MODALS --- */}
+
+      {/* Modal Catat Emosi Siswa */}
+      <Modal
+        isOpen={isEmotionModalOpen}
+        onClose={() => setIsEmotionModalOpen(false)}
+        title={`Catat Emosi Siswa: ${student.fullName}`}
+        size="md"
+      >
+        <form onSubmit={handleSaveEmotion} className="space-y-4 text-xs">
+          <div className="flex bg-slate-100 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setEmotionModalTab('checkIn')}
+              className={`flex-1 py-1.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                emotionModalTab === 'checkIn'
+                  ? 'bg-white text-amber-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-500" />
+              <span>🌅 Check-In Pagi (Masuk)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setEmotionModalTab('checkOut')}
+              className={`flex-1 py-1.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                emotionModalTab === 'checkOut'
+                  ? 'bg-white text-blue-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Heart className="w-3.5 h-3.5 text-blue-600" />
+              <span>🌆 Check-Out Siang (Pulang)</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Tanggal *</label>
+              <input
+                type="date"
+                required
+                value={emoFormDate}
+                onChange={e => setEmoFormDate(e.target.value)}
+                className="w-full p-2 border border-slate-200 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Pilihan Emosi Utama *</label>
+              <select
+                value={emoFormEmotion}
+                onChange={e => setEmoFormEmotion(e.target.value as any)}
+                className="w-full p-2 border border-slate-200 rounded-xl font-bold capitalize"
+              >
+                <option value="senang">😊 Senang & Gembira</option>
+                <option value="tenang">😌 Tenang & Siap Belajar</option>
+                <option value="bersemangat">🤩 Bersemangat</option>
+                <option value="sedih">😢 Sedih</option>
+                <option value="marah">😠 Marah / Kesal</option>
+                <option value="cemas">😰 Cemas / Gelisah</option>
+                <option value="lelah">🥱 Lelah / Mengantuk</option>
+                <option value="kecewa">😞 Kecewa</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-slate-700">Skor Mood (1-10):</span>
+                <span className="font-bold text-emerald-700 bg-white px-1.5 rounded border border-slate-200">
+                  {emoFormScore}/10
+                </span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                value={emoFormScore}
+                onChange={e => setEmoFormScore(parseInt(e.target.value))}
+                className="w-full accent-emerald-600"
+              />
+            </div>
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Cuaca Perasaan:</label>
+              <select
+                value={emoFormWeather}
+                onChange={e => setEmoFormWeather(e.target.value as any)}
+                className="w-full p-1.5 border border-slate-200 rounded-lg bg-white"
+              >
+                <option value="cerah">☀️ Cerah</option>
+                <option value="berawan">⛅ Berawan</option>
+                <option value="hujan">🌧️ Hujan</option>
+                <option value="badai">⛈️ Badai</option>
+                <option value="pelangi">🌈 Pelangi</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">
+              {emotionModalTab === 'checkIn' ? 'Kata Kunci Perasaan Siswa:' : 'Highlight / Hal Menyenangkan Hari Ini:'}
+            </label>
+            <input
+              type="text"
+              value={emoFormPrimary}
+              onChange={e => setEmoFormPrimary(e.target.value)}
+              placeholder="Contoh: Senang belajar sains, tenang saat istirahat..."
+              className="w-full p-2 border border-slate-200 rounded-xl"
+            />
+          </div>
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Catatan Observasi Tambahan:</label>
+            <textarea
+              rows={2}
+              value={emoFormNotes}
+              onChange={e => setEmoFormNotes(e.target.value)}
+              placeholder="Catatan guru mengenai interaksi siswa..."
+              className="w-full p-2 border border-slate-200 rounded-xl"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsEmotionModalOpen(false)}
+              className="px-4 py-2 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl font-semibold cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              Simpan Emosi
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* 1. Modal Observasi Behavior */}
       <Modal

@@ -16,6 +16,11 @@ import {
   SystemConfig,
   AuditLog,
   UserRole,
+  EmotionRecord,
+  LdssRecord,
+  SupervisionSchedule,
+  CaseConferenceRecord,
+  LazuardiStudentSupportRow,
 } from '../types';
 
 interface DatabaseSchema {
@@ -33,6 +38,11 @@ interface DatabaseSchema {
   followUps: FollowUp[];
   mtssReviews: MtssReview[];
   auditLogs: AuditLog[];
+  emotions: EmotionRecord[];
+  ldssRecords: LdssRecord[];
+  supervisions: SupervisionSchedule[];
+  caseConferences: CaseConferenceRecord[];
+  lazuardiSupportRows?: LazuardiStudentSupportRow[];
 }
 
 const DB_DIR = path.join(process.cwd(), 'data');
@@ -911,7 +921,13 @@ class Database {
       }
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (!parsed.emotions) parsed.emotions = [];
+        if (!parsed.ldssRecords) parsed.ldssRecords = [];
+        if (!parsed.supervisions) parsed.supervisions = [];
+        if (!parsed.caseConferences) parsed.caseConferences = [];
+        if (!parsed.lazuardiSupportRows) parsed.lazuardiSupportRows = [];
+        return parsed;
       }
     } catch (err) {
       console.warn('Could not read db.json, initializing with default dataset', err);
@@ -932,6 +948,11 @@ class Database {
       followUps: INITIAL_FOLLOW_UPS,
       mtssReviews: INITIAL_MTSS_REVIEWS,
       auditLogs: INITIAL_AUDIT_LOGS,
+      emotions: [],
+      ldssRecords: [],
+      supervisions: [],
+      caseConferences: [],
+      lazuardiSupportRows: [],
     };
     this.saveDataDirect(defaultData);
     return defaultData;
@@ -1500,6 +1521,347 @@ class Database {
     });
     this.save();
     return newUser;
+  }
+
+  // --- Emotion Methods ---
+  public getEmotions(studentId?: string, classId?: string, date?: string): EmotionRecord[] {
+    if (!this.data.emotions) this.data.emotions = [];
+    let list = this.data.emotions;
+    if (studentId) list = list.filter(e => e.studentId === studentId);
+    if (classId) list = list.filter(e => e.classId === classId);
+    if (date) list = list.filter(e => e.date === date);
+    return list.sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  public saveEmotion(record: Partial<EmotionRecord>, user: User): EmotionRecord {
+    if (!this.data.emotions) this.data.emotions = [];
+    const student = this.getStudentById(record.studentId || '');
+    const studentName = student?.fullName || record.studentName || 'Siswa';
+    const classId = student?.classId || record.classId || '';
+    const className = student?.className || record.className || '';
+    const date = record.date || new Date().toISOString().split('T')[0];
+
+    const existingIdx = this.data.emotions.findIndex(
+      e => e.studentId === record.studentId && e.date === date
+    );
+
+    let resultRecord: EmotionRecord;
+
+    if (existingIdx !== -1) {
+      const existing = this.data.emotions[existingIdx];
+      resultRecord = {
+        ...existing,
+        ...record,
+        checkIn: record.checkIn !== undefined ? record.checkIn : existing.checkIn,
+        checkOut: record.checkOut !== undefined ? record.checkOut : existing.checkOut,
+        cycle21Count: (existing.cycle21Count || 0) + (record.checkIn || record.checkOut ? 1 : 0),
+      };
+      this.data.emotions[existingIdx] = resultRecord;
+    } else {
+      resultRecord = {
+        id: `emo-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        studentId: record.studentId || '',
+        studentName,
+        classId,
+        className,
+        date,
+        checkIn: record.checkIn,
+        checkOut: record.checkOut,
+        cycle21Count: record.checkIn || record.checkOut ? 1 : 0,
+      };
+      this.data.emotions.unshift(resultRecord);
+    }
+
+    this.addAuditLog({
+      entityType: 'EMOTION',
+      entityId: resultRecord.id,
+      actionType: existingIdx !== -1 ? 'UPDATE' : 'CREATE',
+      description: `Pencatatan check-in/out emosi untuk ${studentName} pada ${date}`,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+    });
+
+    this.save();
+    return resultRecord;
+  }
+
+  public batchSaveEmotions(records: Partial<EmotionRecord>[], user: User): EmotionRecord[] {
+    const results: EmotionRecord[] = [];
+    for (const rec of records) {
+      if (rec.studentId) {
+        results.push(this.saveEmotion(rec, user));
+      }
+    }
+    return results;
+  }
+
+  // --- LDSS Methods ---
+  public getLdssRecords(studentId?: string, classId?: string): LdssRecord[] {
+    if (!this.data.ldssRecords) this.data.ldssRecords = [];
+    let list = this.data.ldssRecords;
+    if (studentId) list = list.filter(l => l.studentId === studentId);
+    if (classId) list = list.filter(l => l.classId === classId);
+    return list;
+  }
+
+  public getLdssRecord(studentId: string): LdssRecord | undefined {
+    if (!this.data.ldssRecords) this.data.ldssRecords = [];
+    return this.data.ldssRecords.find(l => l.studentId === studentId);
+  }
+
+  public saveLdssRecord(data: Partial<LdssRecord>, user: User): LdssRecord {
+    if (!this.data.ldssRecords) this.data.ldssRecords = [];
+    const student = this.getStudentById(data.studentId || '');
+    const studentName = student?.fullName || data.studentName || 'Siswa';
+    const classId = student?.classId || data.classId || '';
+    const className = student?.className || data.className || '';
+
+    const existingIdx = this.data.ldssRecords.findIndex(l => l.studentId === data.studentId);
+    let record: LdssRecord;
+
+    if (existingIdx !== -1) {
+      record = {
+        ...this.data.ldssRecords[existingIdx],
+        ...data,
+      };
+      this.data.ldssRecords[existingIdx] = record;
+    } else {
+      record = {
+        id: `ldss-${Date.now()}`,
+        studentId: data.studentId || '',
+        studentName,
+        classId,
+        className,
+        dateFilled: data.dateFilled || new Date().toISOString().split('T')[0],
+        filledById: user.id,
+        filledByName: user.name,
+        filledByRole: user.roleTitle,
+        status: data.status || 'Selesai',
+        findingsSummary: data.findingsSummary || '',
+        targetGoals: data.targetGoals || '',
+        scores: data.scores || {
+          motorikSensori: 4,
+          komunikasiBahasa: 4,
+          kognitifAkademik: 4,
+          perilakuRegulasiEmosi: 3,
+          interaksiSosial: 4,
+          kemandirian: 4,
+        },
+        observationsNotes: data.observationsNotes || {},
+        recommendedTier: data.recommendedTier || 'Tier 2',
+        followUpRecommendations: data.followUpRecommendations || ['Supervisi'],
+        documentDriveUrl: data.documentDriveUrl,
+        principalCheckStatus: data.principalCheckStatus || 'Pending',
+        inclusiveHeadCheckStatus: data.inclusiveHeadCheckStatus || 'Pending',
+        notes: data.notes,
+      };
+      this.data.ldssRecords.unshift(record);
+    }
+
+    // Automatically update student tier recommendation if specified
+    if (student && data.recommendedTier && student.currentTier !== data.recommendedTier) {
+      this.updateStudent(student.id, { currentTier: data.recommendedTier }, user, 'Penyesuaian Tier dari hasil asesmen instrumen skrining LDSS');
+    }
+
+    this.addAuditLog({
+      entityType: 'LDSS',
+      entityId: record.id,
+      actionType: existingIdx !== -1 ? 'UPDATE' : 'CREATE',
+      description: `Menyimpan instrumen Skrining LDSS untuk ${studentName} (Status: ${record.status})`,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+    });
+
+    this.save();
+    return record;
+  }
+
+  // --- Supervisi Methods ---
+  public getSupervisions(studentId?: string, role?: string, status?: string): SupervisionSchedule[] {
+    if (!this.data.supervisions) this.data.supervisions = [];
+    let list = this.data.supervisions;
+    if (studentId) list = list.filter(s => s.studentId === studentId);
+    if (role) list = list.filter(s => s.supervisorRole === role);
+    if (status) list = list.filter(s => s.status === status);
+    return list;
+  }
+
+  public saveSupervision(data: Partial<SupervisionSchedule>, user: User): SupervisionSchedule {
+    if (!this.data.supervisions) this.data.supervisions = [];
+    const student = this.getStudentById(data.studentId || '');
+    const newSup: SupervisionSchedule = {
+      id: `sup-${Date.now()}`,
+      studentId: data.studentId || '',
+      studentName: student?.fullName || data.studentName || 'Siswa',
+      classId: student?.classId || data.classId || '',
+      className: student?.className || data.className || '',
+      teacherName: data.teacherName || 'Wali Kelas',
+      supervisorRole: data.supervisorRole || 'Kepala Bidang Inklusif',
+      supervisorName: data.supervisorName || (data.supervisorRole === 'Kepala Sekolah' ? 'Dr. Sari, M.Pd.' : 'M. Ghofar, M.Psi.'),
+      scheduledDate: data.scheduledDate || new Date().toISOString().split('T')[0],
+      time: data.time || '08:30',
+      topic: data.topic || 'Supervisi perkembangan belajar & perilaku',
+      status: data.status || 'Terjadwal',
+      hasilSupervisi: data.hasilSupervisi,
+      catatanTindakLanjut: data.catatanTindakLanjut,
+      chekingKepalaSekolah: data.chekingKepalaSekolah || { status: 'Pending' },
+      chekingKepalaBidangInklusif: data.chekingKepalaBidangInklusif || { status: 'Pending' },
+    };
+    this.data.supervisions.unshift(newSup);
+
+    this.addAuditLog({
+      entityType: 'SUPERVISION',
+      entityId: newSup.id,
+      actionType: 'CREATE',
+      description: `Menjadwalkan supervisi ${newSup.supervisorRole} (${newSup.supervisorName}) untuk siswa ${newSup.studentName}`,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+    });
+
+    this.save();
+    return newSup;
+  }
+
+  public updateSupervision(id: string, updates: Partial<SupervisionSchedule>, user: User): SupervisionSchedule | null {
+    if (!this.data.supervisions) this.data.supervisions = [];
+    const idx = this.data.supervisions.findIndex(s => s.id === id);
+    if (idx === -1) return null;
+
+    const before = this.data.supervisions[idx];
+    const updated: SupervisionSchedule = {
+      ...before,
+      ...updates,
+      chekingKepalaSekolah: {
+        ...before.chekingKepalaSekolah,
+        ...(updates.chekingKepalaSekolah || {}),
+      },
+      chekingKepalaBidangInklusif: {
+        ...before.chekingKepalaBidangInklusif,
+        ...(updates.chekingKepalaBidangInklusif || {}),
+      },
+    };
+    this.data.supervisions[idx] = updated;
+
+    this.addAuditLog({
+      entityType: 'SUPERVISION',
+      entityId: id,
+      actionType: 'UPDATE',
+      description: `Memperbarui hasil/checking supervisi untuk siswa ${updated.studentName}`,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+    });
+
+    this.save();
+    return updated;
+  }
+
+  // --- Case Conference Methods ---
+  public getCaseConferences(studentId?: string, status?: string): CaseConferenceRecord[] {
+    if (!this.data.caseConferences) this.data.caseConferences = [];
+    let list = this.data.caseConferences;
+    if (studentId) list = list.filter(c => c.studentId === studentId);
+    if (status) list = list.filter(c => c.status === status);
+    return list;
+  }
+
+  public saveCaseConference(data: Partial<CaseConferenceRecord>, user: User): CaseConferenceRecord {
+    if (!this.data.caseConferences) this.data.caseConferences = [];
+    const student = this.getStudentById(data.studentId || '');
+    const newConf: CaseConferenceRecord = {
+      id: `cc-${Date.now()}`,
+      studentId: data.studentId || '',
+      studentName: student?.fullName || data.studentName || 'Siswa',
+      classId: student?.classId || data.classId || '',
+      className: student?.className || data.className || '',
+      teacherName: data.teacherName || 'Wali Kelas',
+      reasonForConference: data.reasonForConference || 'Rekomendasi tindak lanjut komprehensif',
+      status: data.status || 'Direkomendasikan',
+      scheduledDate: data.scheduledDate,
+      scheduledTime: data.scheduledTime,
+      location: data.location || 'Ruang Konseling Inklusif / Zoom',
+      participants: data.participants || [
+        'M. Ghofar, M.Psi. (Kabid Pendidikan Inklusif)',
+        'Dr. Sari, M.Pd. (Kepala Sekolah)',
+        'Ovnica Nitasari (Koordinator MTSS)',
+        'Wali Kelas',
+        'Orang Tua Siswa',
+      ],
+      previousAssessments: data.previousAssessments,
+      draftBipTitle: data.draftBipTitle,
+      agreedCommitments: data.agreedCommitments,
+      minutesDecisions: data.minutesDecisions,
+      followUpActions: data.followUpActions,
+      recommendationDate: data.recommendationDate || new Date().toISOString().split('T')[0],
+    };
+    this.data.caseConferences.unshift(newConf);
+
+    this.addAuditLog({
+      entityType: 'CASE_CONFERENCE',
+      entityId: newConf.id,
+      actionType: 'CREATE',
+      description: `Rekomendasi / Penjadwalan Case Conference untuk ${newConf.studentName}`,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+    });
+
+    this.save();
+    return newConf;
+  }
+
+  public updateCaseConference(id: string, updates: Partial<CaseConferenceRecord>, user: User): CaseConferenceRecord | null {
+    if (!this.data.caseConferences) this.data.caseConferences = [];
+    const idx = this.data.caseConferences.findIndex(c => c.id === id);
+    if (idx === -1) return null;
+
+    const before = this.data.caseConferences[idx];
+    const updated: CaseConferenceRecord = {
+      ...before,
+      ...updates,
+      previousAssessments: {
+        ...before.previousAssessments,
+        ...(updates.previousAssessments || {}),
+      },
+    };
+    this.data.caseConferences[idx] = updated;
+
+    this.addAuditLog({
+      entityType: 'CASE_CONFERENCE',
+      entityId: id,
+      actionType: 'UPDATE',
+      description: `Memperbarui status / komitmen Case Conference untuk ${updated.studentName} (${updated.status})`,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+    });
+
+    this.save();
+    return updated;
+  }
+
+  // --- Lazuardi Support Form Matrix ---
+  public getLazuardiSupportRows(): LazuardiStudentSupportRow[] {
+    if (this.data.lazuardiSupportRows && this.data.lazuardiSupportRows.length > 0) {
+      return this.data.lazuardiSupportRows;
+    }
+    return [];
+  }
+
+  public updateLazuardiSupportRow(studentId: string, updates: Partial<LazuardiStudentSupportRow>, user: User): LazuardiStudentSupportRow | null {
+    if (!this.data.lazuardiSupportRows) this.data.lazuardiSupportRows = [];
+    const idx = this.data.lazuardiSupportRows.findIndex(r => r.studentId === studentId);
+    if (idx === -1) return null;
+
+    this.data.lazuardiSupportRows[idx] = {
+      ...this.data.lazuardiSupportRows[idx],
+      ...updates,
+    };
+    this.save();
+    return this.data.lazuardiSupportRows[idx];
   }
 
   public getClasses(): MasterClass[] {

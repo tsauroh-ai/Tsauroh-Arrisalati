@@ -14,6 +14,11 @@ import {
   SystemConfig,
   AuditLog,
   ReviewThresholdRule,
+  EmotionRecord,
+  LdssRecord,
+  SupervisionSchedule,
+  CaseConferenceRecord,
+  LazuardiStudentSupportRow,
 } from '../types';
 
 let currentUserId = 'usr-guru-1';
@@ -141,6 +146,64 @@ export const api = {
   updateConfig: (data: Partial<SystemConfig>) =>
     request<SystemConfig>('/api/config', { method: 'PUT', body: JSON.stringify(data) }),
   getAuditLogs: () => request<AuditLog[]>('/api/audit-logs'),
+
+  // Emotion Check-In & Check-Out
+  getEmotions: (params?: { studentId?: string; classId?: string; date?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.studentId) q.append('studentId', params.studentId);
+    if (params?.classId) q.append('classId', params.classId);
+    if (params?.date) q.append('date', params.date);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return request<EmotionRecord[]>(`/api/emotions${queryStr}`);
+  },
+  saveEmotion: (data: Partial<EmotionRecord>) =>
+    request<EmotionRecord>('/api/emotions', { method: 'POST', body: JSON.stringify(data) }),
+  batchSaveEmotions: (records: Partial<EmotionRecord>[]) =>
+    request<EmotionRecord[]>('/api/emotions/batch', { method: 'POST', body: JSON.stringify({ records }) }),
+
+  // LDSS (Lazuardi Disability Screening System)
+  getLdssRecords: (params?: { studentId?: string; classId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.studentId) q.append('studentId', params.studentId);
+    if (params?.classId) q.append('classId', params.classId);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return request<LdssRecord[]>(`/api/ldss${queryStr}`);
+  },
+  getLdssRecord: (studentId: string) => request<LdssRecord | null>(`/api/ldss/${studentId}`),
+  saveLdssRecord: (data: Partial<LdssRecord>) =>
+    request<LdssRecord>('/api/ldss', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Supervisi Kepala Sekolah & Kepala Bidang Inklusif
+  getSupervisions: (params?: { studentId?: string; role?: string; status?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.studentId) q.append('studentId', params.studentId);
+    if (params?.role) q.append('role', params.role);
+    if (params?.status) q.append('status', params.status);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return request<SupervisionSchedule[]>(`/api/supervisions${queryStr}`);
+  },
+  saveSupervision: (data: Partial<SupervisionSchedule>) =>
+    request<SupervisionSchedule>('/api/supervisions', { method: 'POST', body: JSON.stringify(data) }),
+  updateSupervision: (id: string, updates: Partial<SupervisionSchedule>) =>
+    request<SupervisionSchedule>(`/api/supervisions/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
+
+  // Case Conferences
+  getCaseConferences: (params?: { studentId?: string; status?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.studentId) q.append('studentId', params.studentId);
+    if (params?.status) q.append('status', params.status);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return request<CaseConferenceRecord[]>(`/api/case-conferences${queryStr}`);
+  },
+  saveCaseConference: (data: Partial<CaseConferenceRecord>) =>
+    request<CaseConferenceRecord>('/api/case-conferences', { method: 'POST', body: JSON.stringify(data) }),
+  updateCaseConference: (id: string, updates: Partial<CaseConferenceRecord>) =>
+    request<CaseConferenceRecord>(`/api/case-conferences/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
+
+  // Lazuardi GCS Support Matrix
+  getLazuardiSupportRows: () => request<LazuardiStudentSupportRow[]>('/api/lazuardi/support-rows'),
+  updateLazuardiSupportRow: (studentId: string, updates: Partial<LazuardiStudentSupportRow>) =>
+    request<LazuardiStudentSupportRow>(`/api/lazuardi/support-rows/${studentId}`, { method: 'PUT', body: JSON.stringify(updates) }),
 
   // Dashboard stats
   getDashboardStats: () => request<any>('/api/dashboard/stats'),

@@ -155,6 +155,106 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onSelectStudent }) =
         )}
       </div>
 
+      {/* Tier 1, Tier 2, Tier 3 Summary KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <button
+          onClick={() => { setSelectedTier('all'); setOnlyFlagged(false); }}
+          className={`p-3.5 rounded-2xl border text-left transition-all ${
+            selectedTier === 'all' && !onlyFlagged
+              ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+              : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
+          }`}
+        >
+          <div className="text-[11px] font-medium opacity-75">Total Siswa</div>
+          <div className="text-xl font-bold mt-0.5">{students.length}</div>
+          <div className="text-[10px] opacity-70 mt-1">Semua Rombel</div>
+        </button>
+
+        <button
+          onClick={() => { setSelectedTier('Tier 1'); setOnlyFlagged(false); }}
+          className={`p-3.5 rounded-2xl border text-left transition-all ${
+            selectedTier === 'Tier 1'
+              ? 'bg-emerald-700 text-white border-emerald-700 shadow-sm'
+              : 'bg-emerald-50/70 hover:bg-emerald-100/70 border-emerald-200 text-emerald-900'
+          }`}
+        >
+          <div className="text-[11px] font-semibold flex items-center justify-between">
+            <span>Tier 1</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-200/60 font-bold">Universal</span>
+          </div>
+          <div className="text-xl font-bold mt-0.5">
+            {students.filter(s => s.currentTier === 'Tier 1').length}
+          </div>
+          <div className="text-[10px] opacity-80 mt-1">
+            {students.length > 0
+              ? `${Math.round((students.filter(s => s.currentTier === 'Tier 1').length / students.length) * 100)}% dari total`
+              : '0%'}
+          </div>
+        </button>
+
+        <button
+          onClick={() => { setSelectedTier('Tier 2'); setOnlyFlagged(false); }}
+          className={`p-3.5 rounded-2xl border text-left transition-all ${
+            selectedTier === 'Tier 2'
+              ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+              : 'bg-amber-50/70 hover:bg-amber-100/70 border-amber-200 text-amber-900'
+          }`}
+        >
+          <div className="text-[11px] font-semibold flex items-center justify-between">
+            <span>Tier 2</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200/60 font-bold">Targeted</span>
+          </div>
+          <div className="text-xl font-bold mt-0.5">
+            {students.filter(s => s.currentTier === 'Tier 2').length}
+          </div>
+          <div className="text-[10px] opacity-80 mt-1">
+            {students.length > 0
+              ? `${Math.round((students.filter(s => s.currentTier === 'Tier 2').length / students.length) * 100)}% dari total`
+              : '0%'}
+          </div>
+        </button>
+
+        <button
+          onClick={() => { setSelectedTier('Tier 3'); setOnlyFlagged(false); }}
+          className={`p-3.5 rounded-2xl border text-left transition-all ${
+            selectedTier === 'Tier 3'
+              ? 'bg-rose-700 text-white border-rose-700 shadow-sm'
+              : 'bg-rose-50/70 hover:bg-rose-100/70 border-rose-200 text-rose-900'
+          }`}
+        >
+          <div className="text-[11px] font-semibold flex items-center justify-between">
+            <span>Tier 3</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-200/60 font-bold">Intensif</span>
+          </div>
+          <div className="text-xl font-bold mt-0.5">
+            {students.filter(s => s.currentTier === 'Tier 3').length}
+          </div>
+          <div className="text-[10px] opacity-80 mt-1">
+            {students.length > 0
+              ? `${Math.round((students.filter(s => s.currentTier === 'Tier 3').length / students.length) * 100)}% dari total`
+              : '0%'}
+          </div>
+        </button>
+
+        <button
+          onClick={() => { setOnlyFlagged(!onlyFlagged); setSelectedTier('all'); }}
+          className={`p-3.5 rounded-2xl border text-left transition-all col-span-2 sm:col-span-1 ${
+            onlyFlagged
+              ? 'bg-purple-700 text-white border-purple-700 shadow-sm'
+              : 'bg-purple-50/70 hover:bg-purple-100/70 border-purple-200 text-purple-900'
+          }`}
+        >
+          <div className="text-[11px] font-semibold flex items-center justify-between">
+            <span>Perlu Review</span>
+            <AlertCircle className="w-3.5 h-3.5 text-purple-500" />
+          </div>
+          <div className="text-xl font-bold mt-0.5">
+            {students.filter(s => s.needsReviewFlag).length}
+          </div>
+          <div className="text-[10px] opacity-80 mt-1">Flag Observasi</div>
+        </button>
+      </div>
+
       {/* Filters Bar */}
       <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

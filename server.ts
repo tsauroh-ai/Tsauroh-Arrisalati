@@ -204,6 +204,102 @@ app.post('/api/mtss-reviews', (req: Request, res: Response) => {
   res.status(201).json(created);
 });
 
+// --- Emotion Check-in & Check-out Endpoints ---
+app.get('/api/emotions', (req: Request, res: Response) => {
+  const studentId = req.query.studentId as string | undefined;
+  const classId = req.query.classId as string | undefined;
+  const date = req.query.date as string | undefined;
+  const list = db.getEmotions(studentId, classId, date);
+  res.json(list);
+});
+
+app.post('/api/emotions', (req: Request, res: Response) => {
+  const user = getAuthUser(req);
+  const saved = db.saveEmotion(req.body, user);
+  res.status(201).json(saved);
+});
+
+app.post('/api/emotions/batch', (req: Request, res: Response) => {
+  const user = getAuthUser(req);
+  const records = req.body.records || [];
+  const saved = db.batchSaveEmotions(records, user);
+  res.status(201).json(saved);
+});
+
+// --- LDSS Endpoints ---
+app.get('/api/ldss', (req: Request, res: Response) => {
+  const studentId = req.query.studentId as string | undefined;
+  const classId = req.query.classId as string | undefined;
+  const list = db.getLdssRecords(studentId, classId);
+  res.json(list);
+});
+
+app.get('/api/ldss/:studentId', (req: Request, res: Response) => {
+  const record = db.getLdssRecord(req.params.studentId);
+  res.json(record || null);
+});
+
+app.post('/api/ldss', (req: Request, res: Response) => {
+  const user = getAuthUser(req);
+  const saved = db.saveLdssRecord(req.body, user);
+  res.status(201).json(saved);
+});
+
+// --- Supervisi Endpoints ---
+app.get('/api/supervisions', (req: Request, res: Response) => {
+  const studentId = req.query.studentId as string | undefined;
+  const role = req.query.role as string | undefined;
+  const status = req.query.status as string | undefined;
+  const list = db.getSupervisions(studentId, role, status);
+  res.json(list);
+});
+
+app.post('/api/supervisions', (req: Request, res: Response) => {
+  const user = getAuthUser(req);
+  const saved = db.saveSupervision(req.body, user);
+  res.status(201).json(saved);
+});
+
+app.put('/api/supervisions/:id', (req: Request, res: Response) => {
+  const user = getAuthUser(req);
+  const updated = db.updateSupervision(req.params.id, req.body, user);
+  if (!updated) return res.status(404).json({ error: 'Jadwal supervisi tidak ditemukan' });
+  res.json(updated);
+});
+
+// --- Case Conference Endpoints ---
+app.get('/api/case-conferences', (req: Request, res: Response) => {
+  const studentId = req.query.studentId as string | undefined;
+  const status = req.query.status as string | undefined;
+  const list = db.getCaseConferences(studentId, status);
+  res.json(list);
+});
+
+app.post('/api/case-conferences', (req: Request, res: Response) => {
+  const user = getAuthUser(req);
+  const saved = db.saveCaseConference(req.body, user);
+  res.status(201).json(saved);
+});
+
+app.put('/api/case-conferences/:id', (req: Request, res: Response) => {
+  const user = getAuthUser(req);
+  const updated = db.updateCaseConference(req.params.id, req.body, user);
+  if (!updated) return res.status(404).json({ error: 'Data case conference tidak ditemukan' });
+  res.json(updated);
+});
+
+// --- Lazuardi Support Form Matrix Endpoints ---
+app.get('/api/lazuardi/support-rows', (req: Request, res: Response) => {
+  res.json(db.getLazuardiSupportRows());
+});
+
+app.put('/api/lazuardi/support-rows/:studentId', (req: Request, res: Response) => {
+  const user = getAuthUser(req);
+  const updated = db.updateLazuardiSupportRow(req.params.studentId, req.body, user);
+  if (!updated) return res.status(404).json({ error: 'Data siswa support tidak ditemukan' });
+  res.json(updated);
+});
+
 // --- Master Data & Config ---
 app.get('/api/classes', (req: Request, res: Response) => {
   res.json(db.getClasses());
